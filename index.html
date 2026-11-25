@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MUD &amp; MORTAR — WW2 Island Artillery</title>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game-canvas"></canvas>
+
+      <!-- Minimal In-Game HUD -->
+      <div id="hud" class="hidden">
+        <div id="hud-top-left">
+          <div id="turn-card">
+            <div class="turn-row">
+              <span id="team-badge">ALLIES</span>
+              <span id="soldier-name">Pvt. Miller</span>
+              <span id="turn-timer">45</span>
+            </div>
+            <div id="phase-hint">Move: WASD · Aim: Drag · Fire: Hold Space / LMB</div>
+          </div>
+          <div id="team-bars">
+            <div class="team-bar-row">
+              <span class="team-label allied">ALLIES</span>
+              <div class="bar-track"><div id="bar-allies" class="bar-fill allied"></div></div>
+              <span id="hp-allies" class="hp-num">400</span>
+            </div>
+            <div class="team-bar-row">
+              <span class="team-label axis">AXIS</span>
+              <div class="bar-track"><div id="bar-axis" class="bar-fill axis"></div></div>
+              <span id="hp-axis" class="hp-num">400</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="hud-top-right">
+          <div id="wind-box" title="Wind affects rockets, mortars, and grenades">
+            <span class="wind-label">WIND</span>
+            <span id="wind-arrow">➔</span>
+            <span id="wind-speed">0</span>
+          </div>
+          <button id="btn-cam" class="hud-btn" title="Toggle Free / Follow Camera (C)">CAM: FOLLOW</button>
+          <button id="btn-mute" class="hud-btn" title="Toggle Sound">SFX ON</button>
+          <button id="btn-help" class="hud-btn" title="Controls">?</button>
+          <button id="btn-menu" class="hud-btn" title="Return to Menu">MENU</button>
+        </div>
+
+        <div id="announcement" class="hidden"></div>
+
+        <div id="hud-bottom">
+          <div id="charge-wrap" class="hidden">
+            <div id="charge-label">POWER</div>
+            <div id="charge-track"><div id="charge-fill"></div></div>
+          </div>
+          <div id="weapon-bar"></div>
+        </div>
+
+        <div id="help-modal" class="hidden">
+          <h3>FIELD MANUAL</h3>
+          <ul>
+            <li><b>W A S D</b> — Walk across island terrain</li>
+            <li><b>Shift</b> — Jump / Hop onto ledges</li>
+            <li><b>Right-Drag / Q E</b> — Orbit &amp; aim yaw</li>
+            <li><b>R / F or Mouse Drag Up/Down</b> — Aim elevation</li>
+            <li><b>Hold Left-Click or Space</b> — Charge &amp; fire weapon</li>
+            <li><b>1 – 6</b> — Select WW2 weapon</li>
+            <li><b>C</b> — Switch Follow / Free Tactical Camera</li>
+            <li><b>Scroll Wheel</b> — Zoom camera</li>
+          </ul>
+          <button id="btn-close-help" class="primary-btn">GOT IT</button>
+        </div>
+      </div>
+
+      <!-- Simple Start Menu Overlay -->
+      <div id="menu-overlay">
+        <div class="menu-card">
+          <div class="stencil-tag">WW2 ISLAND ARTILLERY</div>
+          <h1>MUD &amp; MORTAR</h1>
+          <p class="subtitle">Sculpted 3D clay &amp; mud battlefields. Blast craters, collapse ridges, knock enemy squads into the sea.</p>
+
+          <div class="menu-section">
+            <label>ISLAND BATTLEFIELD</label>
+            <div id="map-picker" class="picker-grid"></div>
+          </div>
+
+          <div class="menu-row">
+            <div class="menu-section">
+              <label>MODE</label>
+              <div class="toggle-group" id="mode-picker">
+                <button data-mode="ai" class="selected">1P vs AI</button>
+                <button data-mode="hotseat">2P Hotseat</button>
+              </div>
+            </div>
+            <div class="menu-section">
+              <label>SQUAD SIZE</label>
+              <div class="toggle-group" id="squad-picker">
+                <button data-size="3" class="selected">3 Men</button>
+                <button data-size="4">4 Men</button>
+              </div>
+            </div>
+          </div>
+
+          <button id="btn-deploy" class="primary-btn deploy-btn">DEPLOY SQUADS</button>
+        </div>
+      </div>
+
+      <!-- Victory Overlay -->
+      <div id="victory-overlay" class="hidden">
+        <div class="menu-card victory-card">
+          <div class="stencil-tag">OPERATION COMPLETE</div>
+          <h2 id="victory-title">ALLIES VICTORIOUS</h2>
+          <p id="victory-stats"></p>
+          <div class="victory-actions">
+            <button id="btn-rematch" class="primary-btn">REMATCH</button>
+            <button id="btn-change-map" class="secondary-btn">CHANGE ISLAND</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Floating Soldier Tags Container -->
+      <div id="tags-layer"></div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

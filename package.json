@@ -1,0 +1,22 @@
+{
+  "name": "mud-and-mortar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WW2 island artillery tactics game with 3D destructible clay and mud terrain physics",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "three": "^0.174.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.174.0",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.0",
+    "vitest": "^3.0.9"
+  }
+}
