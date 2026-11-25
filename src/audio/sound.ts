@@ -139,6 +139,24 @@ class SoundEngine {
     noise.start(now);
   }
 
+  playPickup(): void {
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const notes = [523.25, 659.25, 880];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now + i * 0.065);
+      gain.gain.setValueAtTime(0.15, now + i * 0.065);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.065 + 0.2);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now + i * 0.065);
+      osc.stop(now + i * 0.065 + 0.22);
+    });
+  }
+
   playVictory(): void {
     const ctx = this.ensureContext();
     if (!ctx) return;

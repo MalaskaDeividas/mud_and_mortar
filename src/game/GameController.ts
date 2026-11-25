@@ -9,7 +9,8 @@ import {
 } from '../maps/ww2Islands';
 import { OceanEnvironment } from '../world/OceanEnvironment';
 import { ALLIED_NAMES, AXIS_NAMES, Soldier, TeamId } from '../entities/Soldier';
-import { getWeaponDef, WeaponDef, WeaponId, WEAPONS } from '../weapons/weapons';
+import { SupplyCrate } from '../entities/SupplyCrate';
+import { getWeaponDef, rollCrateWeapon, WeaponDef, WeaponId, WEAPONS } from '../weapons/weapons';
 import { EffectsSystem } from '../effects/EffectsSystem';
 import { sound } from '../audio/sound';
 import { addCartoonOutline, createToonMaterial } from '../graphics/textures';
@@ -92,9 +93,11 @@ export class GameController {
   private aimDots: THREE.Mesh[] = [];
   private impactMarker: THREE.Mesh;
 
-  // Projectiles, naval barrage, and chain fuel-barrel blasts
+  // Projectiles, parachute supply crates, naval barrage, and chain fuel-barrel blasts
   private projectilesGroup = new THREE.Group();
   private projectiles: ActiveProjectile[] = [];
+  private cratesGroup = new THREE.Group();
+  private crates: SupplyCrate[] = [];
   private pendingNaval: PendingNavalShell[] = [];
   private pendingBarrels: PendingBarrelBlast[] = [];
 
@@ -171,7 +174,7 @@ export class GameController {
 
     this.ocean = new OceanEnvironment(this.scene);
     this.effects = new EffectsSystem(this.scene);
-    this.scene.add(this.propsGroup, this.soldiersGroup, this.projectilesGroup, this.aimDotsGroup);
+    this.scene.add(this.propsGroup, this.soldiersGroup, this.cratesGroup, this.projectilesGroup, this.aimDotsGroup);
 
     // 22 bright cartoony aiming trajectory dots + landing ring
     const dotGeo = new THREE.SphereGeometry(0.15, 7, 7);
@@ -243,6 +246,10 @@ export class GameController {
 
     this.spawnSquad('allies', squadSize);
     this.spawnSquad('axis', squadSize);
+
+    // Drop 2 initial parachute weapon crates right as battle starts!
+    this.spawnParachuteCrate(false);
+    this.spawnParachuteCrate(false);
 
     this.activeTeam = 'allies';
     this.beginTurn();
@@ -318,8 +325,10 @@ export class GameController {
         }
       }
 
-      const pos = new THREE.Vector3(spawnX, (sy ?? WATER_LEVEL + 5) + 0.35, spawnZ);
+      const exactGround = this.terrain.findLocalGroundY(spawnX, sy ?? WATER_LEVEL + 5, spawnZ, 2.0, 2.0);
+      const pos = new THREE.Vector3(spawnX, (exactGround ?? sy ?? WATER_LEVEL + 5) + 0.03, spawnZ);
       const soldier = new Soldier(`${team}-${i}`, team, names[i % names.length], pos);
+      soldier.grounded = true;
       soldier.yaw = Math.atan2(-spawnX, -spawnZ);
       this.soldiersGroup.add(soldier.group);
       this.soldiers.push(soldier);
@@ -373,6 +382,11 @@ export class GameController {
     this.camDist = 17.5;
     this.camYaw = this.activeSoldier.yaw + Math.PI;
     this.camPitch = 0.36;
+
+    // Parachute in a fresh WW2 weapon crate every 2nd turn (up to 4 on the island at once)!
+    if (this.turnCount > 1 && this.turnCount % 2 === 0 && this.crates.length < 4) {
+      this.spawnParachuteCrate(true);
+    }
 
     if (this.isCurrentTurnAi()) {
       this.phase = 'ai_thinking';
@@ -625,15 +639,19 @@ export class GameController {
     const delta = target.position.clone().sub(ai.position);
     const horizDist = Math.hypot(delta.x, delta.z);
 
-    let chosen: WeaponId = 'mortar';
-    if (horizDist < 15) {
+    const hasAmmo = (id: WeaponId) => this.teamAmmo[ai.team][id] !== 0;
+
+    let chosen: WeaponId = 'bazooka';
+    if (horizDist < 15 && hasAmmo('grenade')) {
       chosen = 'grenade';
-    } else if (horizDist > 22 && this.teamAmmo[ai.team].naval_strike > 0 && Math.random() < 0.35) {
+    } else if (horizDist > 22 && hasAmmo('naval_strike') && Math.random() < 0.4) {
       chosen = 'naval_strike';
-    } else if (Math.random() < 0.45) {
-      chosen = 'bazooka';
-    } else if (this.teamAmmo[ai.team].bunker_buster > 0 && Math.random() < 0.4) {
+    } else if (hasAmmo('mortar') && Math.random() < 0.5) {
+      chosen = 'mortar';
+    } else if (hasAmmo('bunker_buster') && Math.random() < 0.4) {
       chosen = 'bunker_buster';
+    } else {
+      chosen = 'bazooka';
     }
 
     this.selectedWeapon = chosen;
@@ -727,6 +745,7 @@ export class GameController {
     this.updateTurnAndControls(dt);
     this.updateProjectiles(dt);
     this.updateSoldiers(dt);
+    this.updateCrates(dt);
     this.updateAimPreview();
     this.updateCamera(dt);
     this.updateFloatingTagsAndPopups(dt);
@@ -1034,6 +1053,77 @@ export class GameController {
         this.spawnPopup(splashPos, 'SPLASH!', '#7ce8ff');
         this.callbacks.onAnnouncement(`${s.name} LOST AT SEA!`);
       });
+    }
+  }
+
+  private spawnParachuteCrate(announce: boolean): void {
+    // Pick a solid high-ground spot on the island so crates land reliably on land
+    let dropX = 0;
+    let dropZ = 0;
+    let found = false;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const tx = (Math.random() - 0.5) * 56;
+      const tz = (Math.random() - 0.5) * 44;
+      const sy = this.terrain.getSurfaceHeight(tx, tz);
+      if (sy !== null && sy > WATER_LEVEL + 1.4) {
+        const tooCloseToCrate = this.crates.some((c) => Math.hypot(c.position.x - tx, c.position.z - tz) < 7);
+        if (!tooCloseToCrate) {
+          dropX = tx;
+          dropZ = tz;
+          found = true;
+          break;
+        }
+      }
+    }
+    if (!found) return;
+
+    const weapon = rollCrateWeapon();
+    // Compensate slightly for wind drift during descent so crate lands on the island
+    const spawnPos = new THREE.Vector3(
+      dropX - this.wind.x * 1.4,
+      46 + Math.random() * 8,
+      dropZ - this.wind.y * 1.4
+    );
+    const crate = new SupplyCrate(weapon, spawnPos);
+    this.cratesGroup.add(crate.group);
+    this.crates.push(crate);
+
+    if (announce) {
+      this.callbacks.onAnnouncement('PARACHUTE SUPPLY CRATE INCOMING!');
+    }
+  }
+
+  private updateCrates(dt: number): void {
+    for (let i = this.crates.length - 1; i >= 0; i--) {
+      const c = this.crates[i];
+      c.update(dt, this.terrain, this.wind.x, this.wind.y, (splashPos) => {
+        this.effects.spawnWaterSplash(splashPos, 0.9);
+      });
+
+      if (!c.alive) {
+        this.cratesGroup.remove(c.group);
+        this.crates.splice(i, 1);
+        continue;
+      }
+
+      // Check soldier collection (walk or jump into crate!)
+      for (const s of this.soldiers) {
+        if (!s.alive) continue;
+        const dist = s.position.distanceTo(c.position);
+        if (dist < 1.85) {
+          const team = s.team;
+          if (this.teamAmmo[team][c.weapon.id] >= 0) {
+            this.teamAmmo[team][c.weapon.id] += c.amount;
+          }
+          sound.playPickup();
+          this.spawnPopup(c.position, `+${c.amount} ${c.weapon.name.toUpperCase()}!`, '#7dff7a');
+          this.callbacks.onAnnouncement(`${s.name} COLLECTED +${c.amount} ${c.weapon.name.toUpperCase()}!`);
+          this.cratesGroup.remove(c.group);
+          this.crates.splice(i, 1);
+          this.emitHud();
+          break;
+        }
+      }
     }
   }
 
@@ -1363,6 +1453,8 @@ export class GameController {
     this.props = [];
     this.soldiersGroup.clear();
     this.soldiers = [];
+    this.cratesGroup.clear();
+    this.crates = [];
     this.projectilesGroup.clear();
     this.projectiles = [];
     this.pendingNaval = [];
